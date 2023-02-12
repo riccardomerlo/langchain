@@ -203,6 +203,47 @@ class FAISS(VectorStore):
         )
         return cls(embedding.embed_query, index, docstore, index_to_id)
 
+    @classmethod
+    def from_texts_with_embeddings(
+        cls,
+        texts: List[str],
+        calculated_embeddings: List[List[float]],
+        embedding: Embeddings,
+        metadatas: Optional[List[dict]] = None,
+        **kwargs: Any,
+    ) -> FAISS:
+        """Construct FAISS wrapper from raw documents.
+
+        This is a user friendly interface that:
+            1. Embeds documents.
+            2. Creates an in memory docstore
+            3. Initializes the FAISS database
+
+        This is intended to be a quick way to get started.
+
+        Example:
+            .. code-block:: python
+
+                from langchain import FAISS
+                from langchain.embeddings import OpenAIEmbeddings
+                embeddings = OpenAIEmbeddings()
+                faiss = FAISS.from_texts(texts, embeddings)
+        """
+        faiss = dependable_faiss_import()
+        # embeddings = embedding.embed_documents(texts)
+        index = faiss.IndexFlatL2(len(calculated_embeddings[0]))
+        index.add(np.array(calculated_embeddings, dtype=np.float32))
+        documents = []
+        for i, text in enumerate(texts):
+            metadata = metadatas[i] if metadatas else {}
+            documents.append(Document(page_content=text, metadata=metadata))
+        index_to_id = {i: str(uuid.uuid4()) for i in range(len(documents))}
+        print('docs', len(documents))
+        docstore = InMemoryDocstore(
+            {index_to_id[i]: doc for i, doc in enumerate(documents)}
+        )
+        return cls(embedding.embed_query, index, docstore, index_to_id)
+
     def save_local(self, folder_path: str) -> None:
         """Save FAISS index, docstore, and index_to_docstore_id to disk.
 
